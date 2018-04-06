@@ -2,7 +2,7 @@ import com.sun.org.apache.xpath.internal.operations.Bool;
 
 public class TransportProblem {
 
-    public static final int max = Integer.MAX_VALUE;
+    public static final float max = Float.MAX_VALUE;
 
     public float [][] TransportTable;          //tabela ceny transportu jednej jednostki produktu od danego dostawcy do danego odbiorcy
     public int Providers;                      //ilość dostawcow
@@ -10,15 +10,38 @@ public class TransportProblem {
     public int[] PossessedAmount;              //ilość dobra w magazyniach poszczególnych dostawców
     public int[] Request;                      //zapotrzebowanie na dobro danego odbiorcy
 
+    public int Demand;                          //Popyt
+    public int Suply;                           //Podaż
+
     public float [] A;
     public float [] B;
     public int [][] Base;
     public float [][] Delta;
+
+
+
     //
     public TransportProblem( int Providers, int Recipients, int[] PossessedAmount, int [] Request, float [][] TransportTable)
     {
         this.Providers = Providers;
         this.Recipients = Recipients;
+
+        Demand = 0;
+        Suply = 0;
+        for(int x : Request)
+            Demand += x;
+        for(int x : PossessedAmount)
+            Suply += x;
+
+        if(Demand > Suply)
+        {
+            this.Providers++;
+        }
+        else if (Demand < Suply)
+        {
+            this.Recipients++;
+        }
+
         if(this.Providers < 0 )  this.Providers = 1;
         if(this.Recipients < 0 )  this.Recipients = 1;
 
@@ -31,10 +54,14 @@ public class TransportProblem {
             {
                 this.PossessedAmount[i] = PossessedAmount[i];
             }
-            else
+            else //if(Demand > Suply && i < this.Providers)
             {
-                this.PossessedAmount[i] = 0;
+                this.PossessedAmount[i] = this.Demand - this.Suply;
             }
+//            else
+//            {
+//                this.PossessedAmount[i] = 0;
+//            }
         }
         this.B = new float[this.Recipients];
         this.Request = new int[this.Recipients];
@@ -45,11 +72,16 @@ public class TransportProblem {
             {
                 this.Request[i] = Request[i];
             }
-            else
+            else //if(Demand < Suply && i < this.Recipients)
             {
-                this.Request[i] = 0;
+                this.Request[i] = this.Suply - this.Demand;
             }
+//            else
+//            {
+//                this.Request[i] = 0;
+//            }
         }
+
         this.Base = new int [this.Providers][this.Recipients];
         this.Delta = new float [this.Providers][this.Recipients];
 
@@ -65,10 +97,13 @@ public class TransportProblem {
                 else
                 {
                     this.TransportTable[i][j] = TransportProblem.max;
+                    //this.TransportTable[i][j] = 0;
                 }
                 this.Base[i][j] = -1;
             }
         }
+
+
     }
 
     void Solve()
@@ -89,15 +124,20 @@ public class TransportProblem {
         int [] TRequest = this.Request.clone();
 
         int TSum = 0;
-        for(int i = 0 ; i < TPossessedAmount.length; i++ )
+        if(this.Demand > this.Suply)
         {
-            TSum += TPossessedAmount[i];
+            TSum = this.Demand;
+        }
+        else
+        {
+            TSum = this.Suply;
         }
         while (TSum > 0)
         {
             int TProvider = 0;
             int TRecipient = 0;
-            for(int i = 0; i < TPossessedAmount.length; i++)
+            boolean end = false;
+            for(int i = 0; i < TPossessedAmount.length && !end; i++)
             {
                 for (int j = 0; j < TRequest.length; j++)
                 {
@@ -105,6 +145,8 @@ public class TransportProblem {
                     {
                         TProvider = i;
                         TRecipient = j;
+                        end = true;
+                        break;
                     }
                 }
             }
@@ -136,9 +178,13 @@ public class TransportProblem {
         {
             for(int j = 0; j < this.Recipients; j++)
             {
-                if(this.Base[i][j] == -2)
+                if(this.Base[i][j] < 0)
                 {
-                    this.Base[i][j] = -1;
+                    this.Base[i][j] = 0;
+                }
+                if(this.TransportTable[i][j] == this.max)
+                {
+                    this.TransportTable[i][j] = 0;
                 }
             }
         }
@@ -242,6 +288,10 @@ public class TransportProblem {
                 {
                     this.Delta[i][j] = this.TransportTable[i][j] - this.A[i] - this.B[j];
                 }
+                else
+                {
+                    this.Delta[i][j] = -this.max;
+                }
             }
         }
     }
@@ -256,7 +306,7 @@ public class TransportProblem {
         {
             for(int j = 0; j < this.Recipients; j++)
             {
-                if(this.Delta[i][j] < 0)
+                if(this.Delta[i][j] < 0 && this.Delta[i][j] > -this.max)
                 {
                     if(TProvider > -1 && TRecipient > -1)
                     {
@@ -285,7 +335,7 @@ public class TransportProblem {
                 {
                     if(i != TProvider && j != TRecipient)
                     {
-                        if(this.Delta[i][j] == 0 && this.Delta[TProvider][j] == 0 && this.Delta[i][TRecipient] == 0)
+                        if(this.Delta[i][j] == -this.max && this.Delta[TProvider][j] == -this.max && this.Delta[i][TRecipient] == -this.max)
                         {
                             TA = i;
                             TB = j;
