@@ -1,5 +1,7 @@
 import com.sun.org.apache.xpath.internal.operations.Bool;
 
+import java.util.ArrayList;
+
 public class TransportProblem {
 
     public static final float max = Float.MAX_VALUE;
@@ -296,76 +298,262 @@ public class TransportProblem {
         }
     }
 
-    public Boolean Check()
-    {
+    public Boolean Check() {
+        //Poszukiwanie największej ujemnej wartości
         Boolean work = false;
         int TProvider = -1;
         int TRecipient = -1;
 
-        for(int i = 0; i < this.Providers; i++)
-        {
-            for(int j = 0; j < this.Recipients; j++)
-            {
-                if(this.Delta[i][j] < 0 && this.Delta[i][j] > -this.max)
-                {
-                    if(TProvider > -1 && TRecipient > -1)
-                    {
-                        if(this.Delta[i][j] < this.Delta[TProvider][TRecipient])
-                        {
+        for (int i = 0; i < this.Providers; i++) {
+            for (int j = 0; j < this.Recipients; j++) {
+                if (this.Delta[i][j] < 0 && this.Delta[i][j] > -this.max) {
+                    if (TProvider > -1 && TRecipient > -1) {
+                        if (this.Delta[i][j] < this.Delta[TProvider][TRecipient]) {
                             TProvider = i;
                             TRecipient = j;
                         }
                     }
-                    else
-                    {
+                    else {
                         TProvider = i;
                         TRecipient = j;
                     }
                 }
             }
         }
-
-        if(TProvider > -1 && TRecipient > -1)
+        //Gdy istnieja ujemne wartosci
+        if (TProvider > -1 && TRecipient > -1)
         {
-            int     TA = -1,
-                    TB = -1;
-            for(int i = 0; i < this.Providers; i++)
+            int RowCount[] = new int[this.Providers];
+            int ColumnCount[] = new int[ this.Recipients];
+
+            int ChangeMatrix[][] = new int[ this.Providers][this.Recipients];
+            for (int i = 0; i < this.Providers; i++)
             {
+                RowCount[i] = 0;
                 for(int j = 0; j < this.Recipients; j++)
                 {
-                    if(i != TProvider && j != TRecipient)
-                    {
-                        if(this.Delta[i][j] == -this.max && this.Delta[TProvider][j] == -this.max && this.Delta[i][TRecipient] == -this.max)
-                        {
-                            TA = i;
-                            TB = j;
-                        }
-                    }
+                    ColumnCount[j] = 0;
+                    if(this.Base[i][j] > 0)
+                        ChangeMatrix[i][j] = 0;
+                    else
+                        ChangeMatrix[i][j] = 2; //Zablokowane komórki
                 }
             }
+            ChangeMatrix[TProvider][TRecipient] = 1;
 
-            if(TA > -1 && TB > -1)
+            RowCount[TProvider]++;
+            ColumnCount[TRecipient]++;
+
+            boolean loopSearch = true;
+            int direction = 0;
+            ArrayList<Integer> RootRow = new ArrayList<Integer>();
+            ArrayList<Integer> RootColumn = new ArrayList<Integer>();
+
+            RootRow.add(new Integer(TProvider));
+            RootColumn.add(new Integer(TRecipient));
+
+            int ActualRow = TProvider;
+            int ActualColumn = TRecipient;
+            int TryCount = 0;
+            int Add = 0;
+            while(loopSearch)
             {
-                work = true;
-                int val = this.Base[TA][TB];
-                if( val > this.Base[TProvider][TB]) val = this.Base[TProvider][TB];
-                else if( val > this.Base[TA][TRecipient]) val = this.Base[TA][TRecipient];
+                int NewRow = -1;
+                int NewColumn = -1;
+                if(direction == 0)
+                {
+                    NewColumn = ActualColumn;
+                    for(int i = ActualRow; i < this.Providers; i++)
+                    {
+                        if((ChangeMatrix[i][NewColumn] == 0) && (RowCount[i] < 2) && (ColumnCount[NewColumn] < 2))
+                        {
+                            NewRow = i;
+                            break;
+                        }
+                    }
+                    direction++;
+                }
+                else if(direction == 1)
+                {
+                    NewRow = ActualRow;
+                    for(int j = ActualColumn; j < this.Recipients; j++)
+                    {
+                        if((ChangeMatrix[NewRow][j]) == 0 && (ColumnCount[j] < 2) && (RowCount[NewRow] < 2))
+                        {
+                            NewColumn = j;
+                            break;
+                        }
 
-                if (this.Base[TProvider][TRecipient] < 1) this.Base[TProvider][TRecipient] = val;
-                else this.Base[TProvider][TRecipient] += val;
-                this.Base[TA][TB] += val;
-                this.Base[TProvider][TB] -= val;
-                if(this.Base[TProvider][TB] == 0)
-                {
-                    this.Base[TProvider][TB] = -1;
+                    }
+                    direction++;
                 }
-                this.Base[TA][TRecipient] -= val;
-                if(this.Base[TA][TRecipient] == 0)
+                else if(direction == 2)
                 {
-                    this.Base[TA][TRecipient] = -1;
+                    NewColumn = ActualColumn;
+                    for(int i = 0; i < ActualRow; i++)
+                    {
+                        if((ChangeMatrix[i][NewColumn] == 0) && (RowCount[i] < 2) && (ColumnCount[NewColumn] < 2))
+                        {
+                            NewRow = i;
+                            break;
+                        }
+                    }
+                    direction++;
                 }
+                else
+                {
+                    NewRow = ActualRow;
+                    for(int j = 0; j < ActualColumn ; j++)
+                    {
+                        if((ChangeMatrix[NewRow][j] == 0) && (ColumnCount[j] < 2) && (RowCount[NewRow] < 2)){
+                            NewColumn = j;
+                            break;
+                        }
+                    }
+                    direction = 0;
+                }
+                //Czy znaleziono nowy punkt
+                if(NewRow == -1 || NewColumn == -1)
+                {
+                    direction++;
+                    if(direction > 3)
+                    {
+                        direction = 0;
+                    }
+                    TryCount++;
+                    if((TryCount == 3)&&(RootRow.size() == 1))
+                    {
+                        direction = 1;
+                        Add=1;
+                        TryCount = 0;
+                    }
+                    if(TryCount == 3)
+                    {
+                        ChangeMatrix[ActualRow][ActualColumn] = 2;
+                        RowCount[ActualRow]--;
+                        ColumnCount[ActualColumn]--;
+
+                        RootRow.remove(RootRow.size() - 1);
+                        RootColumn.remove(RootColumn.size() - 1);
+
+                        if(RootColumn.size() <= 0 && RootColumn.size() <= 0)
+                        {
+                            break;
+                        }
+
+                        ActualRow = RootRow.get(RootRow.size() - 1);
+                        ActualColumn = RootColumn.get(RootColumn.size() - 1);
+                        direction = (RootRow.size() + 1 + Add) % 2;
+                        TryCount = 0;
+                    }
+
+
+                    continue;
+                }
+                else
+                {
+                    ChangeMatrix[NewRow][NewColumn] = ChangeMatrix[ActualRow][ActualColumn] * -1;
+
+                    RootRow.add(new Integer(NewRow));
+                    RootColumn.add(new Integer(NewColumn));
+
+                    ActualRow = NewRow;
+                    ActualColumn = NewColumn;
+
+                    RowCount[NewRow]++;
+                    ColumnCount[NewColumn]++;
+                    TryCount = 0;
+                    int x = 0;
+                }
+                //Sprawdzanie czy utworzono petle
+                loopSearch = false;
+
+                int Sum = 0;
+                for (int i = 0; i < this.Providers; i++)
+                {
+                    Sum += RowCount[i];
+                    if(RowCount[i] != 0 && RowCount[i] != 2) loopSearch = true;
+                }
+                if(Sum < 4)
+                {
+                    loopSearch = true;
+                }
+
+                Sum = 0;
+                for (int j = 0; j < this.Recipients; j++)
+                {
+                    Sum += ColumnCount[j];
+                    if(ColumnCount[j] != 0 && ColumnCount[j] != 2) loopSearch = true;
+                }
+                if(Sum < 4)
+                {
+                    loopSearch = true;
+                }
+            }
+            if((RootRow.size() >= 4) && (RootColumn.size() >= 4))
+            {
+                int val = Integer.MAX_VALUE;
+                for(int i = 0; i < RootColumn.size(); i++ )
+                {
+                    int x = RootRow.get(i);
+                    int y = RootColumn.get(i);
+                    if((this.Base[x][y] > 0)&& (ChangeMatrix[x][y] == -1) &&(this.Base[x][y] < val))
+                    {
+                        val = this.Base[x][y];
+                    }
+                }
+                for(int i = 0; i < RootColumn.size(); i++ )
+                {
+                    int x = RootRow.get(i);
+                    int y = RootColumn.get(i);
+                    this.Base[x][y] += ChangeMatrix[x][y] * val;
+                }
+                work = true;
             }
         }
         return work;
     }
+
+
 }
+
+
+
+
+//            int     TA = -1,
+//                    TB = -1;
+//            for(int i = 0; i < this.Providers; i++)
+//            {
+//                for(int j = 0; j < this.Recipients; j++)
+//                {
+//                    if(i != TProvider && j != TRecipient)
+//                    {
+//                        if(this.Delta[i][j] == -this.max && this.Delta[TProvider][j] == -this.max && this.Delta[i][TRecipient] == -this.max)
+//                        {
+//                            TA = i;
+//                            TB = j;
+//                        }
+//                    }
+//                }
+//            }
+//            if(TRow > -1 && TColumn > -1)
+//            {
+//                work = true;
+//                int val = this.Base[TRow][TColumn];
+//                if( val > this.Base[TProvider][TColumn]) val = this.Base[TProvider][TColumn];
+//                else if( val > this.Base[TRow][TRecipient]) val = this.Base[TRow][TRecipient];
+//
+//                if (this.Base[TProvider][TRecipient] < 1) this.Base[TProvider][TRecipient] = val;
+//                else this.Base[TProvider][TRecipient] += val;
+//                this.Base[TRow][TColumn] += val;
+//                this.Base[TProvider][TColumn] -= val;
+//                if(this.Base[TProvider][TColumn] == 0)
+//                {
+//                    this.Base[TProvider][TColumn] = -1;
+//                }
+//                this.Base[TRow][TRecipient] -= val;
+//                if(this.Base[TRow][TRecipient] == 0)
+//                {
+//                    this.Base[TRow][TRecipient] = -1;
+//                }
+//            }
